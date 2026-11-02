@@ -22,12 +22,17 @@ public class ServeurBibliotheque {
     ProtocoleBibliotheque protocole = new ProtocoleBibliotheque(gestion);
 
     try {
-      ServerSocket listening = new ServerSocket(port, 50);
+      ServerSocket listening = new ServerSocket(port);
       System.out.println("Library server listening on " + listening.getLocalSocketAddress());
 
       while (true) {
-        Socket socket = listening.accept();
-        serve(socket, protocole);
+        try {
+          Socket socket = listening.accept();
+          serve(socket, protocole);
+
+        } catch (IOException e) {
+          System.err.println("Client error: " + e.getMessage());
+        }
       }
     } catch (IOException e) {
       System.err.println("Server error: " + e.getMessage());
@@ -35,24 +40,29 @@ public class ServeurBibliotheque {
   }
 
   private static void serve(Socket socket, ProtocoleBibliotheque protocole) throws IOException {
-    socket.setSoTimeout(CLIENT_READ_TIMEOUT_MS);
-    String remote = String.valueOf(socket.getRemoteSocketAddress());
+    try {
+      socket.setSoTimeout(CLIENT_READ_TIMEOUT_MS);
+      String remote = String.valueOf(socket.getRemoteSocketAddress());
 
-    BufferedReader in = new BufferedReader(
-        new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-    BufferedWriter out = new BufferedWriter(
-        new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+      BufferedReader in = new BufferedReader(
+          new InputStreamReader(socket.getInputStream()));
+      BufferedWriter out = new BufferedWriter(
+          new OutputStreamWriter(socket.getOutputStream()));
 
-    String requete = in.readLine();
-    if (requete == null) {
-      System.out.println("[" + remote + "] connection closed without a request");
-      return;
+      String requete = in.readLine();
+      if (requete == null) {
+        System.out.println("[" + remote + "] connection closed without a request");
+        return;
+      }
+
+      System.out.println("[" + remote + "] request : " + requete);
+      String reponse = protocole.traiter(requete);
+      out.write(reponse + "\n");
+      out.flush();
+      System.out.println("[" + remote + "] response: " + reponse);
+
+    } finally {
+      socket.close();
     }
-
-    System.out.println("[" + remote + "] request : " + requete);
-    String reponse = protocole.traiter(requete);
-    out.write(reponse + "\n");
-    out.flush();
-    System.out.println("[" + remote + "] response: " + reponse);
   }
 }
